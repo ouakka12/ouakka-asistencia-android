@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/consts.dart';
+import 'package:flutter_hbb/mobile/pages/home_page.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/server_model.dart';
 
@@ -19,6 +20,8 @@ const String kOuakkaActionAccessibility = 'ouakka.accessibility.details';
 const String kOuakkaActionAppDetails =
     'android.settings.APPLICATION_DETAILS_SETTINGS';
 
+const String kOuakkaRestrictedDone = 'ouakka-restricted-done';
+
 const _teal = Color(0xFF176B73);
 const _navy = Color(0xFF163C46);
 const _red = Color(0xFFAA2632);
@@ -32,12 +35,45 @@ class OuakkaAssistanceGuide extends StatefulWidget {
   State<OuakkaAssistanceGuide> createState() => _OuakkaAssistanceGuideState();
 }
 
-class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide> {
+class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
+    with WidgetsBindingObserver {
   bool _busy = false;
   String? _progress;
   bool _askedControl = false;
+  bool _pendingStep2 = false;
 
   ServerModel get m => widget.model;
+
+  /// Android 13+ bloquea la accesibilidad en apps instaladas fuera de la tienda.
+  bool get _needsRestrictedStep =>
+      androidVersion >= 33 &&
+      bind.mainGetLocalOption(key: kOuakkaRestrictedDone) != 'Y';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    if (ouakkaClientSimpleMode) {
+      // Sin contraseña: el cliente solo pulsa «Aceptar» cuando el operador entra.
+      Future.microtask(() => m.setApproveMode('click'));
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _pendingStep2 && mounted) {
+      _pendingStep2 = false;
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted && !m.inputOk) _paso2();
+      });
+    }
+  }
 
   Future<bool> _waitFor(bool Function() cond, Duration timeout) async {
     final end = DateTime.now().add(timeout);
@@ -133,17 +169,58 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide> {
     final ok = await _ask(
       icon: Icons.touch_app_outlined,
       title: '¿Que el operador pueda tocar tu pantalla?',
-      text:
-          'Es opcional. Si dices que sí, se abrirá Ajustes en el sitio exacto:\n\n'
-          '1. Activa «CORE OUAKKA Asistencia».\n'
-          '2. Acepta el aviso de Android.\n\n'
-          'La app volverá sola a esta pantalla.',
-      yes: 'SÍ, ACTIVAR CONTROL',
+      text: _needsRestrictedStep
+          ? 'Es opcional. Son 2 pasos cortos y solo se hacen UNA VEZ.\n\n'
+              'Te iremos diciendo qué tocar.'
+          : 'Es opcional. Se abrirá Ajustes en el sitio exacto.\n\n'
+              'Activa «CORE OUAKKA Asistencia» y acepta.\n'
+              'La app volverá sola.',
+      yes: 'SÍ, EMPEZAR',
       no: 'Solo ver la pantalla',
     );
-    if (ok == true) {
-      AndroidPermissionManager.startAction(kOuakkaActionAccessibility);
+    if (ok != true) return;
+    if (_needsRestrictedStep) {
+      await _paso1();
+    } else {
+      _abrirAccesibilidad();
     }
+  }
+
+  Future<void> _paso1() async {
+    final ok = await _ask(
+      icon: Icons.lock_open,
+      title: 'PASO 1 de 2: Desbloquear',
+      text: 'Se abrirá la información de la app.\n\n'
+          '① Toca los 3 puntitos  ⋮  arriba a la derecha.\n'
+          '② Toca «Permitir ajustes restringidos».\n'
+          '③ Si te pide el PIN o la huella del móvil, ponlo.\n'
+          '④ Vuelve atrás con la flecha  ←  (o desliza desde el borde).\n\n'
+          'Al volver, te saldrá el PASO 2.',
+      yes: 'ABRIR',
+      no: 'Cancelar',
+    );
+    if (ok != true) return;
+    bind.mainSetLocalOption(key: kOuakkaRestrictedDone, value: 'Y');
+    _pendingStep2 = true;
+    AndroidPermissionManager.startAction(kOuakkaActionAppDetails);
+  }
+
+  Future<void> _paso2() async {
+    final ok = await _ask(
+      icon: Icons.touch_app_outlined,
+      title: 'PASO 2 de 2: Activar',
+      text: 'Se abrirá Ajustes en el sitio exacto.\n\n'
+          '① Activa el interruptor de «CORE OUAKKA Asistencia».\n'
+          '② Pulsa «Permitir» / «Aceptar».\n\n'
+          'La app volverá sola. ¡Ya está!',
+      yes: 'ABRIR',
+      no: 'Ahora no',
+    );
+    if (ok == true) _abrirAccesibilidad();
+  }
+
+  void _abrirAccesibilidad() {
+    AndroidPermissionManager.startAction(kOuakkaActionAccessibility);
   }
 
   @override
@@ -249,8 +326,13 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide> {
                         minimumSize: const Size.fromHeight(48)),
                   ),
                   TextButton(
-                    onPressed: () => _restrictedHelp(context),
-                    child: const Text('¿Sale «Ajuste restringido»? Pulsa aquí'),
+                    onPressed: () {
+                      bind.mainSetLocalOption(
+                          key: kOuakkaRestrictedDone, value: 'N');
+                      _paso1();
+                    },
+                    child: const Text('¿Sale «Ajuste restringido»? Pulsa aquí',
+                        style: TextStyle(fontSize: 15)),
                   ),
                 ],
                 const SizedBox(height: 14),
@@ -298,35 +380,6 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  void _restrictedHelp(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Ajuste restringido'),
-        content: const Text(
-          'Android bloquea este permiso en apps instaladas fuera de la tienda.\n\n'
-          '1. Pulsa «Abrir información de la app».\n'
-          '2. Toca los tres puntos ⋮ arriba a la derecha.\n'
-          '3. Elige «Permitir ajustes restringidos».\n'
-          '4. Vuelve y pulsa otra vez «Permitir que toque mi pantalla».',
-          style: TextStyle(fontSize: 15, height: 1.4),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cerrar')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              AndroidPermissionManager.startAction(kOuakkaActionAppDetails);
-            },
-            child: const Text('Abrir información de la app'),
-          ),
-        ],
       ),
     );
   }

@@ -574,7 +574,8 @@ class ServerInfo extends StatelessWidget {
                       copyToClipboard(model.serverId.value.text.trim());
                     })
               ]).marginOnly(left: 39, bottom: 10),
-            // Password
+            // Password (oculto en modo cliente OUAKKA: se acepta con un toque)
+            if (!ouakkaClientSimpleMode) ...[
             Row(children: [
               const Icon(Icons.lock_outline, color: Colors.grey, size: iconSize)
                   .marginOnly(right: iconMarginRight),
@@ -604,6 +605,7 @@ class ServerInfo extends StatelessWidget {
                           })
                     ])
             ]).marginOnly(left: 40, bottom: 15),
+            ],
             ConnectionStateNotification()
           ],
         ));

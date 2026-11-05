@@ -40,6 +40,7 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
   bool _busy = false;
   String? _progress;
   bool _askedControl = false;
+  bool _askedBattery = false;
   bool _pendingStep2 = false;
 
   ServerModel get m => widget.model;
@@ -152,6 +153,24 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
           setState(() => _progress =
               'No se activó compartir pantalla. Vuelve a pulsar «Recibir ayuda».');
           return;
+        }
+      }
+
+      // Batería: un solo toque en el aviso de Android (sustituye ir a Ajustes > Batería).
+      if (!_askedBattery &&
+          androidVersion >= 23 &&
+          !await AndroidPermissionManager.check(kRequestIgnoreBatteryOptimizations)) {
+        _askedBattery = true;
+        final ok = await _ask(
+          icon: Icons.battery_charging_full,
+          title: 'Que la ayuda no se corte',
+          text: 'Android te va a preguntar si esta app puede seguir funcionando '
+              'en segundo plano.\n\nPulsa «Permitir». Solo se pide una vez.',
+          yes: 'VALE',
+          no: 'Ahora no',
+        );
+        if (ok == true) {
+          await AndroidPermissionManager.request(kRequestIgnoreBatteryOptimizations);
         }
       }
 

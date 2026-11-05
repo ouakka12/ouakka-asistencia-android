@@ -41,6 +41,15 @@ class HomePageState extends State<HomePage> {
       ? _selectedIndex == _chatPageTabIndex
       : false; // change this when ios have chat page
 
+  /// CORE OUAKKA: llega un mensaje del operador -> mostrar la pestaña de chat.
+  void ouakkaOpenChatTab() {
+    if (_chatPageTabIndex < 0 || !mounted) return;
+    setState(() => _selectedIndex = _chatPageTabIndex);
+    gFFI.chatModel.hideChatIconOverlay();
+    gFFI.chatModel.hideChatWindowOverlay();
+    gFFI.chatModel.mobileClearClientUnread(gFFI.chatModel.currentKey.connId);
+  }
+
   void refreshPages() {
     setState(() {
       initPages();
@@ -58,8 +67,10 @@ class HomePageState extends State<HomePage> {
     if (ouakkaClientSimpleMode && isAndroid) {
       // Client app: receive assistance, not control other people's devices.
       // Keep access to settings; never hide Android consent dialogs.
-      _chatPageTabIndex = -1;
+      // Chat con el operador: pestaña propia, se abre sola al llegar un mensaje.
       _pages.add(ServerPage());
+      _chatPageTabIndex = _pages.length;
+      _pages.add(ChatPage(type: ChatPageType.mobileMain));
       _pages.add(SettingsPage());
       _selectedIndex = 0;
       return;

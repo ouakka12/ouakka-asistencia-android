@@ -358,6 +358,11 @@ class MainActivity : FlutterActivity() {
                     )
                     result.success(true)
                 }
+                "ouakka_chat_notify" -> {
+                    val text = call.arguments as? String ?: ""
+                    mainService?.ouakkaChatNotification(text)
+                    result.success(true)
+                }
                 "stop_input" -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                         InputService.ctx?.disableSelf()

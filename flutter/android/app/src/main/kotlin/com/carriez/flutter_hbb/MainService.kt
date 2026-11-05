@@ -51,6 +51,7 @@ const val DEFAULT_NOTIFY_TITLE = "RustDesk"
 const val DEFAULT_NOTIFY_TEXT = "Service is running"
 const val DEFAULT_NOTIFY_ID = 1
 const val NOTIFY_ID_OFFSET = 100
+const val OUAKKA_CHAT_NOTIFY_ID = 99
 
 const val MIME_TYPE = MediaFormat.MIMETYPE_VIDEO_VP9
 
@@ -966,6 +967,34 @@ class MainService : Service() {
             .setContentText("$type:$username-$peerId")
             .build()
         notificationManager.notify(getClientNotifyID(clientID), notification)
+    }
+
+    /** CORE OUAKKA: aviso visible con el mensaje del operador; al tocarlo se abre la app. */
+    @SuppressLint("UnspecifiedImmutableFlag")
+    fun ouakkaChatNotification(text: String) {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            action = Intent.ACTION_MAIN
+            addCategory(Intent.CATEGORY_LAUNCHER)
+        }
+        val pendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.getActivity(this, 7, intent, FLAG_UPDATE_CURRENT or FLAG_IMMUTABLE)
+        } else {
+            PendingIntent.getActivity(this, 7, intent, FLAG_UPDATE_CURRENT)
+        }
+        val notification = NotificationCompat.Builder(this, notificationChannel)
+            .setSmallIcon(R.mipmap.ic_stat_logo)
+            .setContentTitle("Mensaje del operador OUAKKA")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setDefaults(Notification.DEFAULT_ALL)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setColor(ContextCompat.getColor(this, R.color.primary))
+            .setWhen(System.currentTimeMillis())
+            .build()
+        notificationManager.notify(OUAKKA_CHAT_NOTIFY_ID, notification)
     }
 
     private fun getClientNotifyID(clientID: Int): Int {

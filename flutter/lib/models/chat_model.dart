@@ -458,6 +458,15 @@ class ChatModel with ChangeNotifier {
     }
     latestReceivedKey = messagekey;
     notifyListeners();
+    // CORE OUAKKA (app cliente): abrir el chat y avisar con notificación aunque
+    // la app esté en segundo plano (p. ej. mientras el operador ayuda en Chrome).
+    if (ouakkaClientSimpleMode && isAndroid && id != clientModeID) {
+      changeCurrentKey(messagekey);
+      HomePage.homeKey.currentState?.ouakkaOpenChatTab();
+      try {
+        await gFFI.invokeMethod("ouakka_chat_notify", text);
+      } catch (_) {}
+    }
   }
 
   send(ChatMessage message) {

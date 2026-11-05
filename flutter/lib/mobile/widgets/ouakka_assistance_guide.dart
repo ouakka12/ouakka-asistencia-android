@@ -340,11 +340,9 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
                   height: 64,
                   child: ElevatedButton.icon(
                     onPressed: () async {
-                      if (m.inputOk) {
-                        // Retira también el control de pantalla al instante.
-                        await gFFI.invokeMethod('stop_input');
-                        bind.mainSetOption(key: kOptionEnableKeyboard, value: 'N');
-                      }
+                      // Corta la conexión y deja de compartir pantalla.
+                      // El permiso de tocar se QUEDA GUARDADO para la próxima vez
+                      // (sin conexión activa nadie puede usarlo).
                       await m.stopService();
                       _askedControl = false;
                     },
@@ -362,6 +360,15 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
                 ),
               ],
 
+              if (started && m.inputOk)
+                TextButton(
+                  onPressed: () async {
+                    await gFFI.invokeMethod('stop_input');
+                    bind.mainSetOption(key: kOptionEnableKeyboard, value: 'N');
+                  },
+                  child: const Text('Quitar el permiso de tocar mi pantalla',
+                      style: TextStyle(fontSize: 14)),
+                ),
               const SizedBox(height: 14),
               const Row(
                 crossAxisAlignment: CrossAxisAlignment.start,

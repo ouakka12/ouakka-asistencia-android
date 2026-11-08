@@ -6,7 +6,7 @@ name: OUAKKA Android APK
 
 on:
   push:
-    branches: [main, ouakka-main]
+    branches: [main, ouakka-main, play/compliance-consent]
     paths-ignore: ['**.md']
   workflow_dispatch:
     inputs:
@@ -18,6 +18,11 @@ on:
         description: "Clave pública del servidor (contenido de id_ed25519.pub). Es pública, no secreta"
         required: false
         default: ""
+      play_bundle:
+        description: "Generar AAB SIN firmar para pruebas controladas de Google Play"
+        required: false
+        type: boolean
+        default: false
 
 env:
   RUST_VERSION: "1.75"
@@ -25,7 +30,7 @@ env:
   ANDROID_FLUTTER_VERSION: "3.24.5"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
   VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
-  VERSION: "1.5.1"
+  VERSION: "1.5.2"
   NDK_VERSION: "r28c"
 
 jobs:
@@ -162,7 +167,7 @@ jobs:
           cp ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so ./flutter/android/app/src/main/jniLibs/arm64-v8a/
           cp ./target/$TARGET/release/liblibrustdesk.so ./flutter/android/app/src/main/jniLibs/arm64-v8a/librustdesk.so
           pushd flutter
-          flutter build apk --release --target-platform android-arm64 --split-per-abi --dart-define=OUAKKA_CLIENT_SIMPLE_MODE=true
+          flutter build apk --release --target-platform android-arm64 --split-per-abi --build-name=1.5.2 --build-number=2070 --dart-define=OUAKKA_CLIENT_SIMPLE_MODE=true
           popd
           mkdir -p out
           cp flutter/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk out/ouakka-asistencia-${{ env.VERSION }}-arm64-UNSIGNED-DEBUGKEY.apk
@@ -174,3 +179,50 @@ jobs:
           name: ouakka-asistencia-arm64
           path: out/
           retention-days: 14
+
+      # Rama de cumplimiento: genera AAB de QA sin firmar. Nunca subir una APK debug a Play.
+      # La AAB permanece SIN FIRMAR; la clave de subida se guarda en CORE, nunca en GitHub.
+      - name: Build unsigned Play AAB (QA only)
+        if: ${{ (github.event_name == 'workflow_dispatch' && inputs.play_bundle == true) || github.ref_name == 'play/compliance-consent' }}
+        shell: bash
+        env:
+          OUAKKA_SERVER: ${{ inputs.rendezvous_server }}
+          OUAKKA_KEY: ${{ inputs.rs_pub_key }}
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          set -euo pipefail
+          if [ -n "$OUAKKA_SERVER" ] && [ -z "$OUAKKA_KEY" ]; then
+            echo 'Servidor propio especificado sin clave pública: no se compila.' >&2
+            exit 1
+          fi
+          if [ -z "$OUAKKA_SERVER" ]; then
+            echo 'AVISO QA: AAB de pruebas usa los servidores públicos de RustDesk. NO AUTORIZA distribución a clientes ni declaración de infraestructura privada.' >&2
+          fi
+          export PATH=/usr/lib/jvm/java-17-openjdk-amd64/bin:$PATH
+          # El build APK anterior usa debugkey temporal. La AAB NO debe quedar firmada con ella.
+          sed -i 's/signingConfig signingConfigs.debug/signingConfig null/g' flutter/android/app/build.gradle
+          grep -q 'signingConfig null' flutter/android/app/build.gradle
+          pushd flutter
+          flutter build appbundle --release --target-platform android-arm64 --build-name=1.5.2 --build-number=2070 --dart-define=OUAKKA_CLIENT_SIMPLE_MODE=true
+          popd
+          mkdir -p out-play
+          cp flutter/build/app/outputs/bundle/release/app-release.aab "out-play/CORE-OUAKKA-Asistencia-${VERSION}-UNSIGNED.aab"
+          python3 - <<'PY'
+          import glob, zipfile
+          files = glob.glob('out-play/*.aab')
+          assert len(files) == 1, 'No hay una sola AAB'
+          with zipfile.ZipFile(files[0]) as bundle:
+              bad = [n for n in bundle.namelist() if n.startswith('META-INF/') and n.upper().endswith(('.RSA','.DSA','.EC','.SF'))]
+          assert not bad, 'AAB inesperadamente firmada; NO subirla a Google Play: ' + ','.join(bad)
+          print('AAB sin firma en CI; firmar con upload key local de CORE')
+          PY
+          sha256sum out-play/*.aab | tee out-play/SHA256.txt
+
+      - name: Upload unsigned Play AAB for local signing
+        if: ${{ (github.event_name == 'workflow_dispatch' && inputs.play_bundle == true) || github.ref_name == 'play/compliance-consent' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ouakka-play-aab-unsigned
+          path: out-play/
+          retention-days: 7

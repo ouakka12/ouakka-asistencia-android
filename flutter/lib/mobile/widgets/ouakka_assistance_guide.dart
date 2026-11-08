@@ -13,8 +13,9 @@ import 'package:flutter_hbb/models/server_model.dart';
 ///   1. Consentimiento claro en nuestra pantalla.
 ///   2. Permiso de notificaciones (ventana de Android dentro de la app).
 ///   3. Compartir pantalla (ventana de Android «Empezar ahora», dentro de la app).
-///   4. Opcional: permiso de control. Android obliga a activarlo en Ajustes;
-///      abrimos la ficha exacta y la app VUELVE SOLA al activarlo.
+///   4. Opcional: control remoto, con el cliente presente.
+///      Android puede exigir entrar en «Aplicaciones descargadas» para activar
+///      manualmente el servicio. La app ofrece una guía clara, no elude Ajustes.
 /// Ningún permiso se concede sin que la persona lo pulse. No se ocultan avisos.
 const String kOuakkaActionAccessibility = 'ouakka.accessibility.details';
 const String kOuakkaActionAppDetails =
@@ -189,12 +190,13 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
       icon: Icons.touch_app_outlined,
       title: '¿Que el operador pueda tocar tu pantalla?',
       text: _needsRestrictedStep
-          ? 'Es opcional. Son 2 pasos cortos y solo se hacen UNA VEZ.\n\n'
-              'Te iremos diciendo qué tocar.'
-          : 'Es opcional. Se abrirá Ajustes en el sitio exacto.\n\n'
-              'Activa «CORE OUAKKA Asistencia» y acepta.\n'
-              'La app volverá sola.',
-      yes: 'SÍ, EMPEZAR',
+          ? 'Es opcional. Primero te llevaremos a los ajustes de la app.\n\n'
+              'Después te guiaremos para permitir el control.'
+          : 'Es opcional. Android abrirá Accesibilidad.\n\n'
+              'Pulsa «Aplicaciones descargadas», luego '
+              '«CORE OUAKKA: control autorizado» y activa el interruptor.\n\n'
+              'Solo tú puedes autorizarlo.',
+      yes: 'CONTINUAR',
       no: 'Solo ver la pantalla',
     );
     if (ok != true) return;
@@ -219,7 +221,7 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
       no: 'Cancelar',
     );
     if (ok != true) return;
-    bind.mainSetLocalOption(key: kOuakkaRestrictedDone, value: 'Y');
+    // No declarar el paso completado antes de que lo confirme el usuario.
     _pendingStep2 = true;
     AndroidPermissionManager.startAction(kOuakkaActionAppDetails);
   }
@@ -227,15 +229,22 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
   Future<void> _paso2() async {
     final ok = await _ask(
       icon: Icons.touch_app_outlined,
-      title: 'PASO 2 de 2: Activar',
-      text: 'Se abrirá Ajustes en el sitio exacto.\n\n'
-          '① Activa el interruptor de «CORE OUAKKA Asistencia».\n'
-          '② Pulsa «Permitir» / «Aceptar».\n\n'
-          'La app volverá sola. ¡Ya está!',
-      yes: 'ABRIR',
-      no: 'Ahora no',
+      title: 'PASO 2 de 2: Activar control',
+      text: '¿Ya pulsaste «Permitir ajustes restringidos» en la pantalla anterior?\n\n'
+          'Ahora Android abrirá Accesibilidad. Sigue estos pasos:\n\n'
+          '① «Aplicaciones descargadas».\n'
+          '② «CORE OUAKKA: control autorizado».\n'
+          '③ Activa el interruptor y confirma «Permitir».\n\n'
+          'Android exige estos pasos; nunca se activará sin tu permiso.',
+      yes: 'YA LO HICE · ABRIR',
+      no: 'VOLVER AL PASO 1',
     );
-    if (ok == true) _abrirAccesibilidad();
+    if (ok == true) {
+      bind.mainSetLocalOption(key: kOuakkaRestrictedDone, value: 'Y');
+      _abrirAccesibilidad();
+    } else if (ok == false) {
+      await _paso1();
+    }
   }
 
   void _abrirAccesibilidad() {
@@ -276,7 +285,39 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
               ]),
               const SizedBox(height: 16),
 
-              // ---------- EL BOTÓN ÚNICO ----------
+              // ---------- CONTROL AUTORIZADO, VISIBLE DESDE EL PRINCIPIO ----------
+              if (!m.inputOk) ...[
+                SizedBox(
+                  height: 86,
+                  child: ElevatedButton.icon(
+                    onPressed: _busy ? null : _pedirControl,
+                    icon: const Icon(Icons.touch_app_outlined, size: 32),
+                    label: const Text(
+                      'ACTIVAR CONTROL AUTORIZADO',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _teal,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                    ),
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.only(top: 8, bottom: 16),
+                  child: Text(
+                    'Pulsa aquí: te guiamos por los permisos de Android. '
+                    'En Xiaomi tendrás que confirmar el control tú mismo.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 15, height: 1.3, color: _navy),
+                  ),
+                ),
+              ],
+
+              // ---------- RECIBIR AYUDA Y COMPARTIR PANTALLA ----------
               if (!started)
                 SizedBox(
                   height: 96,
@@ -336,13 +377,10 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
                 _permRow('Tocar pantalla', m.inputOk),
                 if (!m.inputOk) ...[
                   const SizedBox(height: 6),
-                  OutlinedButton.icon(
-                    onPressed: _pedirControl,
-                    icon: const Icon(Icons.touch_app_outlined),
-                    label: const Text('Permitir que toque mi pantalla',
-                        style: TextStyle(fontSize: 15)),
-                    style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(48)),
+                  const Text(
+                    'Si todavía no autorizaste el control, usa el botón '
+                    '«ACTIVAR CONTROL AUTORIZADO» que aparece arriba.',
+                    style: TextStyle(fontSize: 15, height: 1.25),
                   ),
                   TextButton(
                     onPressed: () {
@@ -350,7 +388,7 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
                           key: kOuakkaRestrictedDone, value: 'N');
                       _paso1();
                     },
-                    child: const Text('¿Sale «Ajuste restringido»? Pulsa aquí',
+                    child: const Text('¿Android bloquea el control? Guía rápida',
                         style: TextStyle(fontSize: 15)),
                   ),
                 ],

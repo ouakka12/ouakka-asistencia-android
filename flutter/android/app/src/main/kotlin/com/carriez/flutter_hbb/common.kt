@@ -106,16 +106,10 @@ fun startAction(context: Context, action: String) {
     if (action == OUAKKA_ACTION_ACCESSIBILITY) {
         context.getSharedPreferences(OUAKKA_PREFS, Context.MODE_PRIVATE)
             .edit().putBoolean(OUAKKA_RETURN_ON_INPUT, true).apply()
-        val component = android.content.ComponentName(context, InputService::class.java)
-        try {
-            context.startActivity(Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS").apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                putExtra(Intent.EXTRA_COMPONENT_NAME, component.flattenToString())
-            })
-            return
-        } catch (e: Exception) {
-            Log.d("ouakka", "accessibility details not available, fallback: $e")
-        }
+        // Android 15 protege ACCESSIBILITY_DETAILS_SETTINGS con un permiso del
+        // sistema no disponible para apps ordinarias. Evitamos el intento
+        // rechazado y abrimos directamente Ajustes de Accesibilidad para que
+        // la persona elija el servicio de forma consciente.
         startAction(context, ACTION_ACCESSIBILITY_SETTINGS)
         return
     }

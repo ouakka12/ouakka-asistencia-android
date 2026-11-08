@@ -99,7 +99,9 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
       builder: (ctx) => AlertDialog(
         icon: Icon(icon, color: _teal, size: 40),
         title: Text(title, textAlign: TextAlign.center),
-        content: Text(text, style: const TextStyle(fontSize: 16, height: 1.4)),
+        content: SingleChildScrollView(
+          child: Text(text, style: const TextStyle(fontSize: 16, height: 1.4)),
+        ),
         actionsAlignment: MainAxisAlignment.center,
         actions: [
           Column(
@@ -186,18 +188,34 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
   }
 
   Future<void> _pedirControl() async {
+    // Google Play: divulgación destacada antes de abrir Accesibilidad.
+    // El usuario acepta de forma afirmativa o continúa sin control táctil.
+    const disclosure =
+        'CONTROL REMOTO OPCIONAL\n\n'
+        'Si aceptas una sesión de ayuda, un operador humano de CORE OUAKKA '
+        'podrá ver lo que aparece en tu pantalla. Si además autorizas el '
+        'control táctil, podrá pulsar botones, escribir y desplazarse. '
+        'El contenido visible puede incluir datos personales.\n\n'
+        'No muestres contraseñas, PIN, Cl@ve, códigos SMS ni certificados. '
+        'Detén la ayuda antes de identificarte o firmar. Puedes finalizar '
+        'la sesión cuando quieras.\n\n'
+        'No tienes obligación de activar el control táctil: puedes '
+        'continuar con asistencia de solo visualización. Android te '
+        'pedirá que confirmes el permiso personalmente.';
+
+    final ruta = _needsRestrictedStep
+        ? 'Si aceptas, se abrirá la información de la app para '
+            'completar los pasos guiados de Android.'
+        : 'Si aceptas, se abrirá Accesibilidad. En Xiaomi toca '
+            '«Aplicaciones descargadas», «CORE OUAKKA: control '
+            'autorizado» y confirma el permiso.';
+
     final ok = await _ask(
       icon: Icons.touch_app_outlined,
-      title: '¿Que el operador pueda tocar tu pantalla?',
-      text: _needsRestrictedStep
-          ? 'Es opcional. Primero te llevaremos a los ajustes de la app.\n\n'
-              'Después te guiaremos para permitir el control.'
-          : 'Es opcional. Android abrirá Accesibilidad.\n\n'
-              'Pulsa «Aplicaciones descargadas», luego '
-              '«CORE OUAKKA: control autorizado» y activa el interruptor.\n\n'
-              'Solo tú puedes autorizarlo.',
-      yes: 'CONTINUAR',
-      no: 'Solo ver la pantalla',
+      title: '¿Autorizas el control remoto?',
+      text: '$disclosure\n\n$ruta',
+      yes: 'SÍ, ACEPTO · ABRIR AJUSTES',
+      no: 'NO · SOLO VER PANTALLA',
     );
     if (ok != true) return;
     if (_needsRestrictedStep) {

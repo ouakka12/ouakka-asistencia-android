@@ -104,7 +104,9 @@ class HomePageState extends State<HomePage> {
           // backgroundColor: MyTheme.grayBg,
           appBar: AppBar(
             centerTitle: true,
-            title: appTitle(),
+            title: ouakkaClientSimpleMode && isAndroid
+                ? const Text('CORE OUAKKA · Asistencia')
+                : appTitle(),
             actions: _pages.elementAt(_selectedIndex).appBarActions,
           ),
           bottomNavigationBar: BottomNavigationBar(

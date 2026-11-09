@@ -30,7 +30,7 @@ env:
   ANDROID_FLUTTER_VERSION: "3.24.5"
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
   VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
-  VERSION: "1.5.2"
+  VERSION: "1.5.3"
   NDK_VERSION: "r28c"
 
 jobs:
@@ -167,7 +167,7 @@ jobs:
           cp ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so ./flutter/android/app/src/main/jniLibs/arm64-v8a/
           cp ./target/$TARGET/release/liblibrustdesk.so ./flutter/android/app/src/main/jniLibs/arm64-v8a/librustdesk.so
           pushd flutter
-          flutter build apk --release --target-platform android-arm64 --split-per-abi --build-name=1.5.2 --build-number=2070 --dart-define=OUAKKA_CLIENT_SIMPLE_MODE=true
+          flutter build apk --release --target-platform android-arm64 --split-per-abi --build-name=1.5.3 --build-number=2071 --dart-define=OUAKKA_CLIENT_SIMPLE_MODE=true
           popd
           mkdir -p out
           cp flutter/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk out/ouakka-asistencia-${{ env.VERSION }}-arm64-UNSIGNED-DEBUGKEY.apk
@@ -204,7 +204,7 @@ jobs:
           sed -i 's/signingConfig signingConfigs.debug/signingConfig null/g' flutter/android/app/build.gradle
           grep -q 'signingConfig null' flutter/android/app/build.gradle
           pushd flutter
-          flutter build appbundle --release --target-platform android-arm64 --build-name=1.5.2 --build-number=2070 --dart-define=OUAKKA_CLIENT_SIMPLE_MODE=true
+          flutter build appbundle --release --target-platform android-arm64 --build-name=1.5.3 --build-number=2071 --dart-define=OUAKKA_CLIENT_SIMPLE_MODE=true
           popd
           mkdir -p out-play
           cp flutter/build/app/outputs/bundle/release/app-release.aab "out-play/CORE-OUAKKA-Asistencia-${VERSION}-UNSIGNED.aab"

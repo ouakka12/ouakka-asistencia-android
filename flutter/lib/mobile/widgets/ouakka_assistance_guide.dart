@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/mobile/pages/home_page.dart';
+import 'package:flutter_hbb/mobile/widgets/ouakka_diagnostics_page.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/server_model.dart';
 
@@ -362,6 +363,39 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
                   ),
                 ),
 
+              // Diagnóstico guiado: debajo de «Recibir ayuda», sin permisos nuevos.
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _busy
+                    ? null
+                    : () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => OuakkaDiagnosticsPage(
+                              onRequestAssistance: () {
+                                Navigator.of(context).pop();
+                                if (mounted) _recibirAyuda();
+                              },
+                            ),
+                          ),
+                        ),
+                icon: const Icon(Icons.handyman_outlined, size: 25),
+                label: const Text(
+                  'DIAGNÓSTICO Y REPARACIÓN',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(68),
+                  foregroundColor: _teal,
+                  side: const BorderSide(color: _teal, width: 2),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                ),
+              ),
+
               if (_progress != null) ...[
                 const SizedBox(height: 12),
                 Text(_progress!,
@@ -454,7 +488,7 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
                     child: Text(
                       'Nunca compartas tu Cl@ve, PIN, códigos ni contraseñas. '
                       'Para la ayuda antes de identificarte o firmar.',
-                      style: TextStyle(fontSize: 14, height: 1.35),
+                      style: TextStyle(fontSize: 14, height: 1.35, color: _navy),
                     ),
                   ),
                 ],

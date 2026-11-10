@@ -19,17 +19,13 @@ import 'package:flutter_hbb/models/server_model.dart';
 ///      manualmente el servicio. La app ofrece una guía clara, no elude Ajustes.
 /// Ningún permiso se concede sin que la persona lo pulse. No se ocultan avisos.
 const String kOuakkaActionAccessibility = 'ouakka.accessibility.details';
-const String kOuakkaActionAppDetails =
-    'android.settings.APPLICATION_DETAILS_SETTINGS';
-
-const String kOuakkaRestrictedDone = 'ouakka-restricted-done';
-
 const _teal = Color(0xFF176B73);
 const _navy = Color(0xFF163C46);
 const _red = Color(0xFFAA2632);
 
 class OuakkaAssistanceGuide extends StatefulWidget {
-  const OuakkaAssistanceGuide({Key? key, required this.model}) : super(key: key);
+  const OuakkaAssistanceGuide({Key? key, required this.model})
+      : super(key: key);
 
   final ServerModel model;
 
@@ -37,44 +33,20 @@ class OuakkaAssistanceGuide extends StatefulWidget {
   State<OuakkaAssistanceGuide> createState() => _OuakkaAssistanceGuideState();
 }
 
-class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
-    with WidgetsBindingObserver {
+class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide> {
   bool _busy = false;
   String? _progress;
   bool _askedControl = false;
   bool _askedBattery = false;
-  bool _pendingStep2 = false;
 
   ServerModel get m => widget.model;
-
-  /// Android 13+ bloquea la accesibilidad en apps instaladas fuera de la tienda.
-  bool get _needsRestrictedStep =>
-      androidVersion >= 33 &&
-      bind.mainGetLocalOption(key: kOuakkaRestrictedDone) != 'Y';
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     if (ouakkaClientSimpleMode) {
       // Sin contraseña: el cliente solo pulsa «Aceptar» cuando el operador entra.
       Future.microtask(() => m.setApproveMode('click'));
-    }
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && _pendingStep2 && mounted) {
-      _pendingStep2 = false;
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted && !m.inputOk) _paso2();
-      });
     }
   }
 
@@ -150,9 +122,11 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
         setState(() => _progress = 'Preparando…');
         await m.checkRequestNotificationPermission();
 
-        setState(() => _progress = 'Pulsa «Empezar ahora» en el aviso de Android');
+        setState(
+            () => _progress = 'Pulsa «Empezar ahora» en el aviso de Android');
         await m.startService();
-        final shared = await _waitFor(() => m.mediaOk, const Duration(seconds: 60));
+        final shared =
+            await _waitFor(() => m.mediaOk, const Duration(seconds: 60));
         if (!shared) {
           setState(() => _progress =
               'No se activó compartir pantalla. Vuelve a pulsar «Recibir ayuda».');
@@ -163,18 +137,21 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
       // Batería: un solo toque en el aviso de Android (sustituye ir a Ajustes > Batería).
       if (!_askedBattery &&
           androidVersion >= 23 &&
-          !await AndroidPermissionManager.check(kRequestIgnoreBatteryOptimizations)) {
+          !await AndroidPermissionManager.check(
+              kRequestIgnoreBatteryOptimizations)) {
         _askedBattery = true;
         final ok = await _ask(
           icon: Icons.battery_charging_full,
           title: 'Que la ayuda no se corte',
-          text: 'Android te va a preguntar si esta app puede seguir funcionando '
+          text:
+              'Android te va a preguntar si esta app puede seguir funcionando '
               'en segundo plano.\n\nPulsa «Permitir». Solo se pide una vez.',
           yes: 'VALE',
           no: 'Ahora no',
         );
         if (ok == true) {
-          await AndroidPermissionManager.request(kRequestIgnoreBatteryOptimizations);
+          await AndroidPermissionManager.request(
+              kRequestIgnoreBatteryOptimizations);
         }
       }
 
@@ -191,79 +168,36 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
   Future<void> _pedirControl() async {
     // Google Play: divulgación destacada antes de abrir Accesibilidad.
     // El usuario acepta de forma afirmativa o continúa sin control táctil.
-    const disclosure =
-        'CONTROL REMOTO OPCIONAL\n\n'
-        'Si aceptas una sesión de ayuda, un operador humano de CORE OUAKKA '
-        'podrá ver lo que aparece en tu pantalla. Si además autorizas el '
-        'control táctil, podrá pulsar botones, escribir y desplazarse. '
-        'El contenido visible puede incluir datos personales.\n\n'
-        'No muestres contraseñas, PIN, Cl@ve, códigos SMS ni certificados. '
-        'Detén la ayuda antes de identificarte o firmar. Puedes finalizar '
-        'la sesión cuando quieras.\n\n'
-        'No tienes obligación de activar el control táctil: puedes '
-        'continuar con asistencia de solo visualización. Android te '
-        'pedirá que confirmes el permiso personalmente.';
-
-    final ruta = _needsRestrictedStep
-        ? 'Si aceptas, se abrirá la información de la app para '
-            'completar los pasos guiados de Android.'
-        : 'Si aceptas, se abrirá Accesibilidad. En Xiaomi toca '
-            '«Aplicaciones descargadas», «CORE OUAKKA: control '
-            'autorizado» y confirma el permiso.';
+    const disclosure = 'USO DEL SERVICIO DE ACCESIBILIDAD (OPCIONAL)\n\n'
+        'CORE OUAKKA Asistencia utiliza el servicio de Accesibilidad '
+        'para que un operador humano, durante una sesión de ayuda aceptada '
+        'por ti, pueda tocar botones, escribir y desplazarse en tu móvil. '
+        'Android permite que este servicio consulte el contenido de las '
+        'ventanas en pantalla, que puede incluir datos personales y textos '
+        'que estés viendo.\n\n'
+        'La información visible y las acciones de control pueden '
+        'transmitirse al dispositivo del operador a través de la conexión '
+        'remota y de los servidores de conexión configurados, que pueden '
+        'incluir infraestructura de terceros.\n\n'
+        'El control táctil es opcional y requiere tu autorización expresa '
+        'en esta pantalla y en los ajustes de Android. Puedes rechazarlo '
+        'y pedir ayuda solo mediante visualización. Tú aceptas o rechazas '
+        'las sesiones entrantes y puedes detener la asistencia cuando quieras. '
+        'También puedes revocar el servicio en Ajustes > Accesibilidad.\n\n'
+        'Nunca muestres ni entregues contraseñas, PIN, Cl@ve, códigos '
+        'SMS o certificados. Detén la sesión antes de identificarte o firmar.';
 
     final ok = await _ask(
       icon: Icons.touch_app_outlined,
       title: '¿Autorizas el control remoto?',
-      text: '$disclosure\n\n$ruta',
+      text: '$disclosure\n\n'
+          'Si aceptas, se abrirán los ajustes de Accesibilidad de Android. '
+          'Busca «CORE OUAKKA: control autorizado» y confirma el permiso '
+          'personalmente. No cambies otras protecciones de seguridad del móvil.',
       yes: 'SÍ, ACEPTO · ABRIR AJUSTES',
       no: 'NO · SOLO VER PANTALLA',
     );
-    if (ok != true) return;
-    if (_needsRestrictedStep) {
-      await _paso1();
-    } else {
-      _abrirAccesibilidad();
-    }
-  }
-
-  Future<void> _paso1() async {
-    final ok = await _ask(
-      icon: Icons.lock_open,
-      title: 'PASO 1 de 2: Desbloquear',
-      text: 'Se abrirá la información de la app.\n\n'
-          '① Toca los 3 puntitos  ⋮  arriba a la derecha.\n'
-          '② Toca «Permitir ajustes restringidos».\n'
-          '③ Si te pide el PIN o la huella del móvil, ponlo.\n'
-          '④ Vuelve atrás con la flecha  ←  (o desliza desde el borde).\n\n'
-          'Al volver, te saldrá el PASO 2.',
-      yes: 'ABRIR',
-      no: 'Cancelar',
-    );
-    if (ok != true) return;
-    // No declarar el paso completado antes de que lo confirme el usuario.
-    _pendingStep2 = true;
-    AndroidPermissionManager.startAction(kOuakkaActionAppDetails);
-  }
-
-  Future<void> _paso2() async {
-    final ok = await _ask(
-      icon: Icons.touch_app_outlined,
-      title: 'PASO 2 de 2: Activar control',
-      text: '¿Ya pulsaste «Permitir ajustes restringidos» en la pantalla anterior?\n\n'
-          'Ahora Android abrirá Accesibilidad. Sigue estos pasos:\n\n'
-          '① «Aplicaciones descargadas».\n'
-          '② «CORE OUAKKA: control autorizado».\n'
-          '③ Activa el interruptor y confirma «Permitir».\n\n'
-          'Android exige estos pasos; nunca se activará sin tu permiso.',
-      yes: 'YA LO HICE · ABRIR',
-      no: 'VOLVER AL PASO 1',
-    );
-    if (ok == true) {
-      bind.mainSetLocalOption(key: kOuakkaRestrictedDone, value: 'Y');
-      _abrirAccesibilidad();
-    } else if (ok == false) {
-      await _paso1();
-    }
+    if (ok == true) _abrirAccesibilidad();
   }
 
   void _abrirAccesibilidad() {
@@ -314,7 +248,8 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
                     label: const Text(
                       'ACTIVAR CONTROL AUTORIZADO',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _teal,
@@ -401,7 +336,9 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
                 Text(_progress!,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w600, color: _navy)),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: _navy)),
               ],
 
               // ---------- ESTADO DESPUÉS DE PULSAR ----------
@@ -422,7 +359,9 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
                       : online
                           ? Icons.check_circle_outline
                           : Icons.sync,
-                  active || online ? Colors.green.shade800 : Colors.orange.shade900,
+                  active || online
+                      ? Colors.green.shade800
+                      : Colors.orange.shade900,
                 ),
                 const SizedBox(height: 10),
                 _permRow('Ver pantalla', true),
@@ -435,12 +374,9 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
                     style: TextStyle(fontSize: 15, height: 1.25),
                   ),
                   TextButton(
-                    onPressed: () {
-                      bind.mainSetLocalOption(
-                          key: kOuakkaRestrictedDone, value: 'N');
-                      _paso1();
-                    },
-                    child: const Text('¿Android bloquea el control? Guía rápida',
+                    onPressed: _busy ? null : _pedirControl,
+                    child: const Text(
+                        '¿No funciona el control? Revisar permisos',
                         style: TextStyle(fontSize: 15)),
                   ),
                 ],
@@ -488,7 +424,8 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
                     child: Text(
                       'Nunca compartas tu Cl@ve, PIN, códigos ni contraseñas. '
                       'Para la ayuda antes de identificarte o firmar.',
-                      style: TextStyle(fontSize: 14, height: 1.35, color: _navy),
+                      style:
+                          TextStyle(fontSize: 14, height: 1.35, color: _navy),
                     ),
                   ),
                 ],
@@ -520,7 +457,9 @@ class _OuakkaAssistanceGuideState extends State<OuakkaAssistanceGuide>
               children: [
                 Text(title,
                     style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: color)),
                 const SizedBox(height: 4),
                 Text(text, style: const TextStyle(fontSize: 15, height: 1.3)),
               ],
